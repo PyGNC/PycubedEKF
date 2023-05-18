@@ -1,2 +1,2 @@
 # PycubedEKF
-Python implementation of orbital estimation
+Core python implementation of an EKF
