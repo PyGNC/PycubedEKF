@@ -12,7 +12,7 @@ class EKFCore:
         self.V = V
 
     def predict(self, dt):
-        x_predicted = self.f(self.x)
+        x_predicted = self.f(self.x, dt)
         A = jacobian(lambda x: self.f(x, dt))(x_predicted)
         P_predicted = A @ self.P @ A.T + self.W
         return x_predicted, P_predicted
