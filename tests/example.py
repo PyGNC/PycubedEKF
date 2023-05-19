@@ -11,8 +11,8 @@ class TestBasicEKFConvergence(unittest.TestCase):
 
     def test_2d_point(self):
 
-        def dynamics(x):
-            return np.array([x[0]+x[2], x[1]+x[3], x[2], x[3]])
+        def dynamics(x, dt):
+            return np.array([x[0]+x[2]*dt, x[1]+x[3]*dt, x[2], x[3]])
 
         def measure(x):
             return np.array([x[0], x[1]])

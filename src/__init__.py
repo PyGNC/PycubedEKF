@@ -11,9 +11,9 @@ class EKFCore:
         self.W = W
         self.V = V
 
-    def predict(self):
+    def predict(self, dt):
         x_predicted = self.f(self.x)
-        A = jacobian(self.f)(x_predicted)
+        A = jacobian(lambda x: self.f(x, dt))(x_predicted)
         P_predicted = A @ self.P @ A.T + self.W
         return x_predicted, P_predicted
 
@@ -28,8 +28,8 @@ class EKFCore:
     def kalman_gain(self, P_predicted, C, S):
         return P_predicted @ C.T @ np.linalg.inv(S)
 
-    def update(self, y):
-        (x_predicted, P_predicted) = self.predict()
+    def update(self, y, dt):
+        (x_predicted, P_predicted) = self.predict(dt)
         (Z, S, C) = self.innovation(y, x_predicted, P_predicted)
         L = self.kalman_gain(P_predicted, C, S)
         self.x = x_predicted + L @ Z
