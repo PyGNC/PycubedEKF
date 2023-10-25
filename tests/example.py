@@ -24,3 +24,7 @@ class TestBasicEKFConvergence(unittest.TestCase):
         for i in range(100):
             EKF.update(np.array([0.4+i*0.1, 0.4+i*0.3]))
         assert_array_almost_equal(EKF.x, np.array([10.3, 30.3, 0.1, 0.3]))
+
+
+if __name__ == '__main__':
+    unittest.main()
