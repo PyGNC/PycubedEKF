@@ -7,6 +7,7 @@ R_EARTH = 6.3781363e6
 OMEGA_EARTH = 7.292115146706979e-5
 
 
+#altitude in km
 def atm_density(alt):
     """
     Expoential fit model from SMAD data 
@@ -35,10 +36,16 @@ def process_dynamics(x):
     v_rel = v - np.cross(omega_earth, q)
 
     # get the altititude in km
-    alt = np.linalg.norm(q) - (R_EARTH*1e-3)
+    alt = (np.linalg.norm(q) - R_EARTH)*1e-3
+
+    #print("this is altitude")
+    #print(alt)
 
     # estimated rho
     rho_est = atm_density(alt)
+
+    #for testing
+    #rho_est = 1e-13
 
     # drag force
     f_drag = -0.5*cd*(A)*rho_est*np.linalg.norm(v_rel)*v_rel
@@ -64,6 +71,7 @@ def process_dynamics(x):
 
 
 def rk4(x, h, f):
+    
     k1 = f(x)
     k2 = f(x + h/2 * k1)
     k3 = f(x + h/2 * k2)
@@ -87,8 +95,20 @@ class EKF(EKFCore):
         std_gps_measurement = 10
         std_velocity = 0.01
 
-        q_betas = 2e-9 * np.ones(3)
-        q_eps = 5.5e-11 * np.ones(3)
+
+        #original values that worked in julia
+        #work well for dt=25
+        q_betas = 8e-8 * np.ones(3)
+        q_eps = 1.5e-10 * np.ones(3)
+
+        #work well for dt=1
+        #q_betas = 2e-9 * np.ones(3)
+        #q_eps = 5.5e-11 * np.ones(3)
+
+        #tuning here
+        #q_betas = 8e-8 * np.ones(3)
+        #q_eps = 5.5e-11 * np.ones(3)
+
         R_measure = np.identity(3) * ((std_gps_measurement)**2)/3
 
         P0 = np.identity(12) * np.hstack((np.ones(3) * ((std_gps_measurement)**2)/3,
