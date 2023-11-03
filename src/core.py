@@ -1,12 +1,10 @@
-
-#the unmodeled accelerations are small and covariances also small which
-#cause floating point precision issues causing the filter to diverge...
-
 from autograd import jacobian, numpy as np
 from scipy.linalg import sqrtm
 from scipy.linalg import qr
 from scipy.linalg import solve
+import brahe
 
+#The state vector is defined as follows:
 # x[0], x[1], x[2] -> x,y,z position
 # x[3], x[4], x[5] -> x,y,z velocity
 # x[6], x[7], x[8] -> x,y,z unmodeled accelerations (epsilons)
@@ -24,9 +22,11 @@ class EKFCore:
         self.epsilons = epsilons  # this is the tuning parameters q epsilon
         self.R = R  # measurement noise
 
-    # pass in just a timestep h
-    #prediction step is exactly the same as the julia implementation. Checked...
     def predict(self, h):
+        """
+        EKF prediction step
+        h is the timestep
+        """
 
         # discrete dynamics function of state
         x_predicted = self.f(self.x, h)
@@ -44,7 +44,6 @@ class EKFCore:
         Y_ = h*np.identity(3) * \
             np.array([self.betas[0], self.betas[1], self.betas[2]])
 
-        # tested (old)
         Qt_1 = np.hstack((0.25*(h**4)*V_, 0.5*(h**3)*V_,
                          0.5*(h**2)*V_, np.zeros((3, 3))))
         Qt_2 = np.hstack((0.5*(h**3)*V_, h**2*V_, h*V_, np.zeros((3, 3))))
@@ -53,14 +52,6 @@ class EKFCore:
         Qt_stack = np.vstack((Qt_1, Qt_2, Qt_3, Qt_4))
         
         Qt = np.identity(12)*np.diag(Qt_stack)
-
-        #pose_std_dynamics = 3e-5 #these pose and velocity values are pretty good
-        #velocity_std_dynamics = 0.5e-5
-        #kp_a = 2e-5
-        #betaq = 2.25e-3
-
-        #going to try a fixed Q (same result)
-        #Qt = np.identity(12)*np.hstack(([np.ones(3)*(pose_std_dynamics**2)/3], [np.ones(3)*(velocity_std_dynamics**2)/3], [(np.ones(3)*kp_a**2)/3], [(np.ones(3)*betaq**2)/3]))
 
         # propogate the sqrt covariance
         n = np.vstack((F@A.T, sqrtm(np.real(Qt))))
@@ -71,17 +62,30 @@ class EKFCore:
 
     # mesurement y is from GPS. Ensure it is from timestep k+1
     # g is the measurement function
-    #innovation is good and matches julia
-    def innovation(self, y, x_predicted, F_predicted):
+    def innovation(self, y, x_predicted, F_predicted, epoch):
+        """
+        EKF Innovation Step. 
+        y is the true GPS measurement
+        x_predicted is the predicted state
+        F_predicted is the predicted square root covariance
+        epoch is the time associated with the measurement
+        """
 
+        #predicted measurement in ECI
         y_predicted, C = self.g(x_predicted)
 
+        # transform the true gps measurement from ECEF to ECI at 
+        y_eci = brahe.frames.sECEFtoECI(epoch, y)
+
         # innovation
-        Z = y - y_predicted
+        Z = y_eci - y_predicted
 
         return Z,  C
 
     def kalman_gain(self, F_predicted, C):
+        """
+        EKF Kalman Gain
+        """
 
         m = np.vstack((F_predicted@C.T, sqrtm(self.R)))
 
@@ -95,17 +99,23 @@ class EKFCore:
 
         return L
 
-    def update(self, y, dt):
-        
+    def update(self, y, dt, epoch):
+        """
+        EKF update step
+        """
+        #Predict the next state and covariance
         x_predicted, F_predicted = self.predict(dt)
 
-        Z, C = self.innovation(y, x_predicted, F_predicted)
+        #innovation step
+        Z, C = self.innovation(y, x_predicted, F_predicted, epoch)
 
+        #calculate kalman gain
         L = self.kalman_gain(F_predicted, C)
 
-        # update the class
+        # update the state
         self.x = x_predicted + L @ Z
 
         e = np.vstack((F_predicted@(np.identity(12)-L@C).T, sqrtm(self.R)@L.T))
 
+        #update the square root covariance
         _, self.F = qr(e, mode='economic')
