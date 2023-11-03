@@ -48,6 +48,8 @@ class TestEKFSimConvergence(unittest.TestCase):
 
         N = 1000 #number of timesteps to run the EKF for
 
+        #N = GPS_num
+
         #define all states and sqrt covariances
         all_states = np.zeros((12, N))
         all_sqrt_covariances = np.zeros((12,12, N))
@@ -120,7 +122,7 @@ class TestEKFSimConvergence(unittest.TestCase):
             all_az_std[i] = all_sqrt_covariances[8,8, i]
 
 
-        ground_truth = np.loadtxt('data/groundtruth_data.txt', delimiter='\t')
+        ground_truth = np.loadtxt('data/Ground_Truth/groundtruth_data.txt', delimiter='\t')
 
 
         res1 = ground_truth[0,0:N] - all_states[0,:]
@@ -191,7 +193,7 @@ class TestEKFSimConvergence(unittest.TestCase):
         axs[2, 2].set_title('Z acceleration Residuals')
 
         for ax in axs.flat:
-            ax.set(xlabel='Time (s)', ylabel='Difference (m - m/s - m/s^2)')
+            ax.set(xlabel='Timestep (s)', ylabel='Difference (m - m/s - m/s^2)')
 
         # Hide x labels and tick labels for top plots and y ticks for right plots.
         for ax in axs.flat:

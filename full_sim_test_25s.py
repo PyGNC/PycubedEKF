@@ -37,17 +37,21 @@ class TestEKFSimConvergence(unittest.TestCase):
         #Initialize the EKF class
         EKF_test = src.EKF(x0)
 
-        #GPS measurements in the ECEF frame. (5 orbits worith of data)
+        #GPS measurements in the ECEF frame. (5 orbits worith of data) #accuracy of 10 m and 1 mm/s
         GPS_measurements = np.loadtxt('data/gps_data_10m_1mm_s/gps_measurements_ecef_new.txt', delimiter='\t')
+        
+        #accuracy of 10 m and 1 cm/s. Make sure to update the init. py file for the velocity accuracy
+        #GPS_measurements = np.loadtxt('data/gps_data_10m_1cm_s/gps_measurements_ecef_new.txt', delimiter='\t')
+
 
         #number of GPS measurements
         GPS_num = GPS_measurements.shape[1]
 
         #this is to sample the GPS measurements to only read every 25 seconds
         start = 25   # Start value
-        end = 5000    # End value for about 1 orbit worth of data
+        #end = 5000    # End value for about 1 orbit worth of data
         #for about 5 orbits worth of data
-        #end = 25000    # End value
+        end = 25000    # End value
         spacing = 25 # Fixed spacing
 
         horizon = np.linspace(start, end, int((end - start) / spacing) + 1)
@@ -216,7 +220,7 @@ class TestEKFSimConvergence(unittest.TestCase):
         axs[2, 2].set_title('Z acceleration Residuals')
 
         for ax in axs.flat:
-            ax.set(xlabel='Time (s)', ylabel='Difference (m - m/s - m/s^2)')
+            ax.set(xlabel='Timestep (s)', ylabel='Difference (m - m/s - m/s^2)')
 
         # Hide x labels and tick labels for top plots and y ticks for right plots.
         for ax in axs.flat:
