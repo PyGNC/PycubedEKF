@@ -16,6 +16,9 @@ Both check that the RMS error for the positions are less than 1 meter at the end
 ## Results
 Shows the consistency plots for the filter
 
+## Generating GPS data
+Inside the julia implementation folder, create_gps_data.ipynb generates GPS data for a specific orbit and GPS measurment errors. When using new measurement errors, make sure to update the filter intialization in the init.py file. 
+
 ## Running 
 python full_sim_test_25s.py
 python full_sim_test.py
