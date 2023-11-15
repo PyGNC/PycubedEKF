@@ -120,7 +120,7 @@ class TestEKFSimConvergence(unittest.TestCase):
             all_az_std[i] = all_sqrt_covariances[8,8, i]
 
 
-        ground_truth = np.loadtxt('data/groundtruth_data.txt', delimiter='\t')
+        ground_truth = np.loadtxt('data/Ground_Truth/groundtruth_data.txt', delimiter='\t')
 
 
         res1 = ground_truth[0,0:N] - all_states[0,:]

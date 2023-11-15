@@ -9,6 +9,46 @@ import brahe
 # x[3], x[4], x[5] -> x,y,z velocity
 # x[6], x[7], x[8] -> x,y,z unmodeled accelerations (epsilons)
 # x[9], x[10], x[11] -> time correlation coefficients (betas)
+class BatchLSQCore:
+    def __init__(self, x0, y, dynamics, measure, Q, R) -> None:
+        self.x = x0 # initial state estimate
+        self.y = y # measurements
+        self.f = dynamics # discrete dynamics function used
+        self.g = measure # measurement function used
+        self.R = R # measurement noise
+        self.Q = Q # process noise
+    
+    def residuals(self):
+        ############################################################
+        #generate residuals of dynamics and measurement            #
+        #estimate of the orbit of multiple satellites              #
+        ############################################################
+        Q_sqrt_inv = sqrtm(np.linalg.inv(self.Q))
+        R_sqrt_inv = sqrtm(np.linalg.inv(self.R))
+        dyn_res = (self.x - self.f(self.x))@Q_sqrt_inv
+        meas_res = (self.g(self.x) - self.y)@R_sqrt_inv
+        return np.vstack((dyn_res, meas_res))
+    
+    def residuals_sum(self):
+        residuals = self.residuals()
+        return np.sum(residuals*residuals)
+    
+    def jacobian(self):
+        J = jacobian(self.residuals_sum)(self.x)
+        return J
+    
+    def solve(self):
+        #solve the least squares problem
+        J = self.jacobian()
+        Jt = J.T
+        b = self.residuals()
+        H = Jt@J
+        g = Jt@b
+        dx = solve(H, g)
+        return dx
+
+
+        
 
 class EKFCore:
     # constructor
