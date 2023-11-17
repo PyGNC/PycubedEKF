@@ -232,7 +232,8 @@ class TestBASimConvergence(unittest.TestCase):
         x0_deputy3 = np.loadtxt('data/Ground_Truth/groundtruth_data_dep3.txt', delimiter='\t')
         #concatenate ground truths
         x0_gt = np.concatenate((x0_chief, x0_deputy1, x0_deputy2, x0_deputy3), axis=0)
-        x0_gt = x0_gt[:,0:200]
+        idx = np.arange(0, 60*10, 60)
+        x0_gt = x0_gt[:,idx]
         #generate measurements
         y_gps = np.concatenate((x0_gt[0:3] + np.random.normal(0, 10, size=(x0_gt[0:3].shape)),x0_gt[3:6] + np.random.normal(0,0.01, size = (x0_gt[3:6].shape))))
         y_ranging1 = np.linalg.norm(x0_gt[0:3] - x0_gt[6:9], axis = 0) + np.random.normal(0, 2, size = (x0_gt[0:3].shape[1]))
@@ -258,7 +259,9 @@ class TestBASimConvergence(unittest.TestCase):
 
         #J = BA_test.jac()
 
-        dx = BA_test.solve()
+        # dx = BA_test.solve()
+
+        x_est = BA_test.iterate(max_iters)
         
         #print("Batch LSQ Done")
 
