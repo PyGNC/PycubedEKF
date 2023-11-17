@@ -10,13 +10,14 @@ import brahe
 # x[6], x[7], x[8] -> x,y,z unmodeled accelerations (epsilons)
 # x[9], x[10], x[11] -> time correlation coefficients (betas)
 class BatchLSQCore:
-    def __init__(self, x0, y, dynamics, measure, Q, R) -> None:
+    def __init__(self, x0, y, dynamics, measure, Q, R,dt) -> None:
         self.x = x0 # initial state estimate
         self.y = y # measurements
         self.f = dynamics # discrete dynamics function used
         self.g = measure # measurement function used
         self.R = R # measurement noise
         self.Q = Q # process noise
+        self.dt = dt
     
     def residuals(self):
         ############################################################
@@ -25,21 +26,24 @@ class BatchLSQCore:
         ############################################################
         Q_sqrt_inv = sqrtm(np.linalg.inv(self.Q))
         R_sqrt_inv = sqrtm(np.linalg.inv(self.R))
-        dyn_res = (self.x - self.f(self.x))@Q_sqrt_inv
-        meas_res = (self.g(self.x) - self.y)@R_sqrt_inv
-        return np.vstack((dyn_res, meas_res))
+        dyn_res = Q_sqrt_inv@(self.x[:,1:] - self.f(self.x,self.dt)[:,:-1])
+        meas_res = R_sqrt_inv@(self.g(self.x)[:,:-1] - self.y[:,:-1])
+        #print(meas_res.shape, dyn_res.shape)
+        stacked_res = np.vstack((dyn_res, meas_res))
+        # print(stacked_res.shape)
+        return stacked_res
     
     def residuals_sum(self):
         residuals = self.residuals()
-        return np.sum(residuals*residuals)
+        return np.sum(residuals)
     
-    def jacobian(self):
-        J = jacobian(self.residuals_sum)(self.x)
+    def jac(self):
+        J = jacobian(lambda x,y: self.residuals_sum())(self.x,self.y)
         return J
     
     def solve(self):
-        #solve the least squares problem
-        J = self.jacobian()
+        #solve the least squares problem in the form JtJdx = Jtb
+        J = self.jac()
         Jt = J.T
         b = self.residuals()
         H = Jt@J
@@ -47,6 +51,16 @@ class BatchLSQCore:
         dx = solve(H, g)
         return dx
 
+    def update(self):
+        dx = self.solve()
+        x_new = self.x - dx
+        return x_new
+    
+    def iterate(self, max_iter):
+        for i in range(max_iter):
+            x_new = self.update()
+        self.x = x_new
+        return self.x
 
         
 

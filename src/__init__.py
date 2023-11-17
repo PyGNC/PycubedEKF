@@ -1,7 +1,7 @@
 import autograd.numpy as np
 from scipy.linalg import sqrtm
 
-from .core import EKFCore
+from .core import EKFCore, BatchLSQCore
 
 R_EARTH = 6.3781363e6 #Radius of the Earth in meters
 OMEGA_EARTH = 7.292115146706979e-5 #angular velocity of the Earth in rad/s
@@ -31,10 +31,10 @@ def process_dynamics(x):
     v = np.array(x[3:6])
 
     #unmodeled accelerations
-    a_d = np.array(x[6:9])
+    # a_d = np.array(x[6:9])
 
     #time correlation coefficients
-    beta = np.array(x[9:12])
+    # beta = np.array(x[9:12])
 
     # drag coefficient
     cd = 2.0
@@ -74,14 +74,14 @@ def process_dynamics(x):
         ((((5*np.dot(q, Iz)**2)/np.linalg.norm(q)**2)-1)*q - 2*np.dot(q, Iz)*Iz)
 
     #total acceleration (two body + J2 + drag + unmodeled accelerations)
-    a = a_2bp + a_J2 + f_drag + a_d
+    a = a_2bp + a_J2 + f_drag #+ a_d
 
     #unmodeled accelerations modeled as a first order gaussian process
     #time corellation coefficients modeled as a random walk (time derivative = 0)
-    a_d_dot = -np.diag(beta)@a_d
+    # a_d_dot = -np.diag(beta)@a_d
 
     #state derivative
-    x_dot = np.concatenate([v, a, a_d_dot, np.zeros(3)])
+    x_dot = np.concatenate([v, a])#, a_d_dot, np.zeros(3)])
 
     return x_dot
 
@@ -143,3 +143,90 @@ class EKF(EKFCore):
 
         super().__init__(x0, F0, time_dynamics,
                          measurement_function, q_betas, q_eps, R_measure)
+        
+class BA(BatchLSQCore):
+    """
+    Defines the Batch Least-Squares solver for the orbit determination problem
+    """
+
+    def __init__(self, x0,y):
+
+        def time_dynamics_single(x, dt):
+            """
+            Discrete-time dynamics function
+            """
+            x_cat = np.zeros(24)
+            for i in range(3):
+                x_i = x[i*6:(i+1)*6]
+                xi_1 = rk4(x_i, dt, process_dynamics)
+                x_cat[i*6:(i+1)*6] = xi_1
+            return x_cat
+        
+        def time_dynamics(x, dt):
+            """"
+            Batch dynamics function
+            """
+            x_dyn = np.zeros_like(x)
+            for i in range(x.shape[1]):
+                x_dyn[:,i] = time_dynamics_single(x[:,i], dt)
+            return x_dyn
+        
+        def measurement_function_single(x):
+            """
+            Measurement function for GPS measurements providing position and velocity, provides ranges between chief and deputy
+            """
+            measurement_gps = x[0:6]
+            measurement_range = np.array([np.linalg.norm(x[0:3] - x[6:9]),np.linalg.norm(x[0:3] - x[12:15]),np.linalg.norm(x[0:3] - x[18:21])])
+            #print(measurement_range.shape, measurement_gps.shape)
+            measurement = np.concatenate((measurement_gps, measurement_range))
+            return measurement
+        
+        def measurement_function(x):
+            """
+            batch measurement function
+            """
+            #print(x.shape)
+            x_meas = np.zeros((9, x.shape[1]))
+            for i in range(x.shape[1]):
+                x_meas[:,i] = measurement_function_single(x[:,i])
+            #print(x_meas.shape)
+            return x_meas
+
+        #standard deviation of the GPS position measurement in meters
+        std_gps_measurement = 10
+
+        #standard devation of the GPS velocity measurement in m/s
+        std_velocity = 0.001
+        #switch depending if we are using an accuracy of mm/s or cm/s on the velocity
+        #std_velocity = 0.01
+
+        # standard deviation of the range measurement in meters
+        std_range = 1
+
+        #tuning parameters for the first order gauss markov model
+        # q_betas = 2e-9 * np.ones(3)
+        # q_eps = 5.5e-11 * np.ones(3)
+
+        # Process noise covariances
+        pose_std_dynamics = 4e-6#*1e-3 #get to km
+        velocity_std_dynamics = 8e-6 #*1e-3 #get to km/s
+
+        #measurement noise matrix
+        R_measure = np.identity(9) * np.hstack([(((std_gps_measurement)**2)/3)*np.ones(3), ((std_velocity)**2)/3*np.ones(3), ((std_range)**2)/3*np.ones(3)])
+
+        #Process ovariance matrix for one satellite
+        Q_ind = np.hstack((np.ones(3) * ((pose_std_dynamics)**2)/3, np.ones(3) * ((velocity_std_dynamics)**2)/3))
+        #Repeat Q_ind for all satellites
+        Q_proc = np.diag(np.hstack((Q_ind, Q_ind, Q_ind, Q_ind)))
+        
+
+        #initial state
+        x0 = x0
+
+        dt = 1
+        #initial measurement
+        # y = measurement_function(x0)
+
+        super().__init__(x0, y, time_dynamics,
+                         measurement_function, Q_proc, R_measure,dt)
+        # self, x0, y, dynamics, measure, Q, R
