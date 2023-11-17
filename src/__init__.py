@@ -44,7 +44,6 @@ def process_dynamics(x):
 
     # angular velocity of the Earth
     omega_earth = np.array([0, 0, OMEGA_EARTH])
-
     # relative velocity
     v_rel = v - np.cross(omega_earth, q)
 
@@ -177,7 +176,7 @@ class BA(BatchLSQCore):
             """
             measurement_gps = x[0:6]
             measurement_range = np.array([np.linalg.norm(x[0:3] - x[6:9]),np.linalg.norm(x[0:3] - x[12:15]),np.linalg.norm(x[0:3] - x[18:21])])
-            #print(measurement_range.shape, measurement_gps.shape)
+            # print(measurement_range.shape, measurement_gps.shape)
             measurement = np.concatenate((measurement_gps, measurement_range))
             return measurement
         
@@ -191,6 +190,45 @@ class BA(BatchLSQCore):
                 x_meas[:,i] = measurement_function_single(x[:,i])
             #print(x_meas.shape)
             return x_meas
+        
+        def residuals(x,y,Q,R,dt):
+            ############################################################
+            #generate residuals of dynamics and measurement            #
+            #estimate of the orbit of multiple satellites              #
+            ############################################################
+            x = x.reshape((24, -1))
+            Q_sqrt_inv = sqrtm(np.linalg.inv(Q))
+            R_sqrt_inv = sqrtm(np.linalg.inv(R))
+            dyn_res_c = np.array([])
+            dyn_res_d1 = np.array([])
+            dyn_res_d2 = np.array([])
+            dyn_res_d3 = np.array([])
+            meas_res = np.array([])
+            for i in range(x.shape[1]-1):
+                dyn_res_ci = Q_sqrt_inv@(x[0:6,i+1] - rk4(x[0:6,i],dt,process_dynamics))
+                dyn_res_c = np.concatenate((dyn_res_c, dyn_res_ci))
+                dyn_res_d1i = Q_sqrt_inv@(x[6:12,i+1] - rk4(x[6:12,i],dt,process_dynamics))
+                dyn_res_d1 = np.hstack((dyn_res_d1, dyn_res_d1i))
+                dyn_res_d2i = Q_sqrt_inv@(x[12:18,i+1] - rk4(x[12:18,i],dt,process_dynamics))
+                dyn_res_d2 = np.hstack((dyn_res_d2, dyn_res_d2i))
+                dyn_res_d3i = Q_sqrt_inv@(x[18:24,i+1] - rk4(x[18:24,i],dt,process_dynamics))
+                dyn_res_d3 = np.hstack((dyn_res_d3, dyn_res_d3i))
+                meas_resi = R_sqrt_inv@(measurement_function_single(x[:,i]) - y[:,i])
+                meas_res = np.hstack((meas_res, meas_resi))
+            dyn_res_c = dyn_res_c.reshape((6, x.shape[1]-1))
+            dyn_res_d1 = dyn_res_d1.reshape((6, x.shape[1]-1))
+            dyn_res_d2 = dyn_res_d2.reshape((6, x.shape[1]-1))
+            dyn_res_d3 = dyn_res_d3.reshape((6, x.shape[1]-1))
+            meas_res = meas_res.reshape((9, x.shape[1]-1))
+            dyn_res = np.vstack((dyn_res_c, dyn_res_d1, dyn_res_d2, dyn_res_d3))
+            # print(meas_res.shape, dyn_res.shape)
+            stacked_res = np.vstack((dyn_res, meas_res))
+            # print(stacked_res.shape)
+            return stacked_res.reshape(-1,1)
+    
+        def residuals_sum(x,y,Q,R,dt):
+            res = residuals(x,y,Q,R,dt)
+            return np.sum(res)
 
         #standard deviation of the GPS position measurement in meters
         std_gps_measurement = 10
@@ -215,9 +253,9 @@ class BA(BatchLSQCore):
         R_measure = np.identity(9) * np.hstack([(((std_gps_measurement)**2)/3)*np.ones(3), ((std_velocity)**2)/3*np.ones(3), ((std_range)**2)/3*np.ones(3)])
 
         #Process ovariance matrix for one satellite
-        Q_ind = np.hstack((np.ones(3) * ((pose_std_dynamics)**2)/3, np.ones(3) * ((velocity_std_dynamics)**2)/3))
+        Q_proc = np.hstack((np.ones(3) * ((pose_std_dynamics)**2)/3, np.ones(3) * ((velocity_std_dynamics)**2)/3))
         #Repeat Q_ind for all satellites
-        Q_proc = np.diag(np.hstack((Q_ind, Q_ind, Q_ind, Q_ind)))
+        Q_proc = np.diag(Q_proc)
         
 
         #initial state
@@ -228,5 +266,5 @@ class BA(BatchLSQCore):
         # y = measurement_function(x0)
 
         super().__init__(x0, y, time_dynamics,
-                         measurement_function, Q_proc, R_measure,dt)
+                         measurement_function, residuals, Q_proc, R_measure,dt)
         # self, x0, y, dynamics, measure, Q, R

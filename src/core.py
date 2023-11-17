@@ -1,4 +1,5 @@
-from autograd import jacobian, numpy as np
+from autograd import jacobian
+from autograd import numpy as np
 from scipy.linalg import sqrtm
 from scipy.linalg import qr
 from scipy.linalg import solve
@@ -10,42 +11,46 @@ import brahe
 # x[6], x[7], x[8] -> x,y,z unmodeled accelerations (epsilons)
 # x[9], x[10], x[11] -> time correlation coefficients (betas)
 class BatchLSQCore:
-    def __init__(self, x0, y, dynamics, measure, Q, R,dt) -> None:
+    def __init__(self, x0, y, dynamics, measure, residuals, Q, R,dt) -> None:
         self.x = x0 # initial state estimate
         self.y = y # measurements
         self.f = dynamics # discrete dynamics function used
         self.g = measure # measurement function used
+        self.r = residuals # residuals function
         self.R = R # measurement noise
         self.Q = Q # process noise
         self.dt = dt
     
-    def residuals(self):
-        ############################################################
-        #generate residuals of dynamics and measurement            #
-        #estimate of the orbit of multiple satellites              #
-        ############################################################
-        Q_sqrt_inv = sqrtm(np.linalg.inv(self.Q))
-        R_sqrt_inv = sqrtm(np.linalg.inv(self.R))
-        dyn_res = Q_sqrt_inv@(self.x[:,1:] - self.f(self.x,self.dt)[:,:-1])
-        meas_res = R_sqrt_inv@(self.g(self.x)[:,:-1] - self.y[:,:-1])
-        #print(meas_res.shape, dyn_res.shape)
-        stacked_res = np.vstack((dyn_res, meas_res))
-        # print(stacked_res.shape)
-        return stacked_res
+    # def residuals(self,x,y):
+    #     ############################################################
+    #     #generate residuals of dynamics and measurement            #
+    #     #estimate of the orbit of multiple satellites              #
+    #     ############################################################
+    #     Q_sqrt_inv = sqrtm(np.linalg.inv(self.Q))
+    #     R_sqrt_inv = sqrtm(np.linalg.inv(self.R))
+    #     dyn_res = Q_sqrt_inv@(x[:,1:] - self.f(x,self.dt)[:,:-1])
+    #     meas_res = R_sqrt_inv@(self.g(x)[:,:-1] - y[:,:-1])
+    #     #print(meas_res.shape, dyn_res.shape)
+    #     stacked_res = np.vstack((dyn_res, meas_res))
+    #     # print(stacked_res.shape)
+    #     return stacked_res
     
-    def residuals_sum(self):
-        residuals = self.residuals()
-        return np.sum(residuals)
+    # def residuals_sum(self,x,y):
+    #     residuals = self.residuals(x,y)
+    #     return np.sum(residuals)
     
     def jac(self):
-        J = jacobian(lambda x,y: self.residuals_sum())(self.x,self.y)
+        print("calculating jacobian")
+        J = jacobian(lambda x: self.r(x, self.y, self.Q, self.R, self.dt))(self.x.reshape(-1,1))
         return J
     
     def solve(self):
         #solve the least squares problem in the form JtJdx = Jtb
         J = self.jac()
+        J = J.reshape((J.shape[0], -1))
         Jt = J.T
-        b = self.residuals()
+        b = self.r(self.x, self.y, self.Q, self.R, self.dt)
+        # breakpoint()
         H = Jt@J
         g = Jt@b
         dx = solve(H, g)
@@ -53,6 +58,7 @@ class BatchLSQCore:
 
     def update(self):
         dx = self.solve()
+        dx = dx.reshape((24, -1))
         x_new = self.x - dx
         return x_new
     
