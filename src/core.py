@@ -40,7 +40,7 @@ class BatchLSQCore:
     #     return np.sum(residuals)
     
     def jac(self):
-        print("calculating jacobian")
+        # print("calculating jacobian")
         J = jacobian(lambda x: self.r(x, self.y, self.Q, self.R, self.dt))(self.x.reshape(-1,1))
         return J
     
@@ -50,22 +50,21 @@ class BatchLSQCore:
         J = J.reshape((J.shape[0], -1))
         Jt = J.T
         b = self.r(self.x, self.y, self.Q, self.R, self.dt)
-        # breakpoint()
         H = Jt@J
         g = Jt@b
         dx = solve(H, g)
+        breakpoint()
         return dx
 
     def update(self):
         dx = self.solve()
         dx = dx.reshape((24, -1))
-        x_new = self.x - dx
-        return x_new
+        return self.x + dx
     
     def iterate(self, max_iter):
         for i in range(max_iter):
-            x_new = self.update()
-        self.x = x_new
+            self.x = self.update()
+        # self.x = x_new
         return self.x
 
         

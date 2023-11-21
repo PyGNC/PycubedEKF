@@ -148,7 +148,7 @@ class BA(BatchLSQCore):
     Defines the Batch Least-Squares solver for the orbit determination problem
     """
 
-    def __init__(self, x0,y):
+    def __init__(self, x0,y,dt):
 
         def time_dynamics_single(x, dt):
             """
@@ -261,7 +261,6 @@ class BA(BatchLSQCore):
         #initial state
         x0 = x0
 
-        dt = 1
         #initial measurement
         # y = measurement_function(x0)
 
