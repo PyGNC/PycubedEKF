@@ -247,15 +247,20 @@ class TestBASimConvergence(unittest.TestCase):
         #print("y shape: ", y.shape)
 
         #initial guess
-
-        x0 = x0_gt
+        x0c = np.concatenate((x0_gt[0:3,idx] + np.random.normal(0, 1, size=(x0_gt[0:3,idx].shape)),x0_gt[3:6] + np.random.normal(0,0.01, size = (x0_gt[3:6,idx].shape))))
+        x0d1 = np.concatenate((x0_gt[6:9,idx] + np.random.normal(0, 1, size=(x0_gt[6:9,idx].shape)),x0_gt[9:12] + np.random.normal(0,0.01, size = (x0_gt[9:12,idx].shape))))
+        x0d2 = np.concatenate((x0_gt[12:15,idx] + np.random.normal(0, 1, size=(x0_gt[12:15,idx].shape)),x0_gt[15:18] + np.random.normal(0,0.01, size = (x0_gt[15:18,idx].shape))))
+        x0d3 = np.concatenate((x0_gt[18:21,idx] + np.random.normal(0, 1, size=(x0_gt[18:21,idx].shape)),x0_gt[21:24] + np.random.normal(0,0.01, size = (x0_gt[21:24,idx].shape))))
+        x0 = np.concatenate((x0c, x0d1, x0d2, x0d3), axis=0)
+        # x0 = x0_gt
+        # x0 = np.concatenate((x0_chief[:,idx],x0_chief[:,idx]+np.randn,x0_chief[:,idx],x0_chief[:,idx]), axis = 0)
 
         #Initialize the EKF class
         BA_test = src.BA(x0,y,dt)
 
         #iterate the BA
 
-        max_iters = 1 #number of timesteps to run the Batch LSQ
+        max_iters = 10 #number of timesteps to run the Batch LSQ
 
         #res_sum = BA_test.residuals_sum()
 
@@ -264,7 +269,7 @@ class TestBASimConvergence(unittest.TestCase):
         # dx = BA_test.solve()
 
         x_est = BA_test.iterate(max_iters)
-        print((x0_gt-x_est))
+        error = x0_gt-x_est
         breakpoint()
         #print("Batch LSQ Done")
 

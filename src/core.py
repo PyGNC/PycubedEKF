@@ -44,7 +44,20 @@ class BatchLSQCore:
         J = jacobian(lambda x: self.r(x, self.y, self.Q, self.R, self.dt))(self.x.reshape(-1,1))
         return J
     
-    def solve(self):
+    def linesearch(self, dx, max_iter):
+        alpha = 1
+        for i in range(max_iter):
+            dx = dx.reshape((24, -1))
+            x_new = self.x + alpha*dx
+            if np.linalg.norm(self.r(x_new, self.y, self.Q, self.R, self.dt)) < np.linalg.norm(self.r(self.x, self.y, self.Q, self.R, self.dt)):
+                return alpha*dx
+            else:
+                alpha = alpha/2
+        print("linesearch failed")
+        return alpha*dx
+        
+    
+    def solver(self):
         #solve the least squares problem in the form JtJdx = Jtb
         J = self.jac()
         J = J.reshape((J.shape[0], -1))
@@ -53,11 +66,12 @@ class BatchLSQCore:
         H = Jt@J
         g = Jt@b
         dx = solve(H, g)
-        breakpoint()
+        dx = self.linesearch(dx,35)
+        # breakpoint()
         return dx
 
     def update(self):
-        dx = self.solve()
+        dx = self.solver()
         dx = dx.reshape((24, -1))
         return self.x + dx
     
