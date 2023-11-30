@@ -148,7 +148,7 @@ class BA(BatchLSQCore):
     Defines the Batch Least-Squares solver for the orbit determination problem
     """
 
-    def __init__(self, x0,y,dt):
+    def __init__(self,xc, x0d,y,dt):
 
         def time_dynamics_single(x, dt):
             """
@@ -170,64 +170,65 @@ class BA(BatchLSQCore):
                 x_dyn[:,i] = time_dynamics_single(x[:,i], dt)
             return x_dyn
         
-        def measurement_function_single(x):
+        def measurement_function_single(xc,xd):
             """
             Measurement function for GPS measurements providing position and velocity, provides ranges between chief and deputy
             """
-            measurement_gps = x[0:6]
-            measurement_range = np.array([np.linalg.norm(x[0:3] - x[6:9]),np.linalg.norm(x[0:3] - x[12:15]),np.linalg.norm(x[0:3] - x[18:21])])
+            # measurement_gps = xc
+            measurement_range = np.array([np.linalg.norm(xc[0:3] - xd[0:3]),np.linalg.norm(xc[0:3] - xd[6:9]),np.linalg.norm(xc[0:3] - xd[12:15])])
             # print(measurement_range.shape, measurement_gps.shape)
-            measurement = np.concatenate((measurement_gps, measurement_range))
-            return measurement
+            # measurement = np.concatenate((measurement_gps, measurement_range))
+            return measurement_range
         
-        def measurement_function(x):
+        def measurement_function(xc,xd):
             """
             batch measurement function
             """
             #print(x.shape)
-            x_meas = np.zeros((9, x.shape[1]))
-            for i in range(x.shape[1]):
-                x_meas[:,i] = measurement_function_single(x[:,i])
+            x_meas = np.zeros((3, xd.shape[1]))
+            for i in range(xd.shape[1]):
+                x_meas[:,i] = measurement_function_single(xc[:,i], xd[:,i])
             #print(x_meas.shape)
             return x_meas
         
-        def residuals(x,y,Q,R,dt):
+        def residuals(xc, xd,y,Q,R,dt):
             ############################################################
             #generate residuals of dynamics and measurement            #
             #estimate of the orbit of multiple satellites              #
             ############################################################
-            x = x.reshape((24, -1))
-            Q_sqrt_inv = sqrtm(np.linalg.inv(Q))
-            R_sqrt_inv = sqrtm(np.linalg.inv(R))
-            dyn_res_c = np.array([])
+            xd = xd.reshape((18, -1))
+            xc = xc.reshape((6, -1))
+            Q_sqrt_inv = Q#sqrtm(np.linalg.inv(Q))
+            R_sqrt_inv = R#sqrtm(np.linalg.inv(R))
+            # dyn_res_c = np.array([])
             dyn_res_d1 = np.array([])
             dyn_res_d2 = np.array([])
             dyn_res_d3 = np.array([])
             meas_res = np.array([])
-            for i in range(x.shape[1]-1):
-                dyn_res_ci = Q_sqrt_inv@(x[0:6,i+1] - rk4(x[0:6,i],dt,process_dynamics))
-                dyn_res_c = np.concatenate((dyn_res_c, dyn_res_ci))
-                dyn_res_d1i = Q_sqrt_inv@(x[6:12,i+1] - rk4(x[6:12,i],dt,process_dynamics))
+            for i in range(xd.shape[1]-1):
+                # dyn_res_ci = Q_sqrt_inv@(x[0:6,i+1] - rk4(x[0:6,i],dt,process_dynamics))
+                # dyn_res_c = np.concatenate((dyn_res_c, dyn_res_ci))
+                dyn_res_d1i = Q_sqrt_inv@(xd[0:6,i+1] - rk4(xd[0:6,i],dt,process_dynamics))
                 dyn_res_d1 = np.hstack((dyn_res_d1, dyn_res_d1i))
-                dyn_res_d2i = Q_sqrt_inv@(x[12:18,i+1] - rk4(x[12:18,i],dt,process_dynamics))
+                dyn_res_d2i = Q_sqrt_inv@(xd[6:12,i+1] - rk4(xd[6:12,i],dt,process_dynamics))
                 dyn_res_d2 = np.hstack((dyn_res_d2, dyn_res_d2i))
-                dyn_res_d3i = Q_sqrt_inv@(x[18:24,i+1] - rk4(x[18:24,i],dt,process_dynamics))
+                dyn_res_d3i = Q_sqrt_inv@(xd[12:18,i+1] - rk4(xd[12:18,i],dt,process_dynamics))
                 dyn_res_d3 = np.hstack((dyn_res_d3, dyn_res_d3i))
-                meas_resi = R_sqrt_inv@(measurement_function_single(x[:,i]) - y[:,i])
+                meas_resi = R_sqrt_inv@(measurement_function_single(xc[:,i],xd[:,i]) - y[:,i])
                 meas_res = np.hstack((meas_res, meas_resi))
-            dyn_res_c = dyn_res_c.reshape((6, x.shape[1]-1))
-            dyn_res_d1 = dyn_res_d1.reshape((6, x.shape[1]-1))
-            dyn_res_d2 = dyn_res_d2.reshape((6, x.shape[1]-1))
-            dyn_res_d3 = dyn_res_d3.reshape((6, x.shape[1]-1))
-            meas_res = meas_res.reshape((9, x.shape[1]-1))
-            dyn_res = np.vstack((dyn_res_c, dyn_res_d1, dyn_res_d2, dyn_res_d3))
+            # dyn_res_c = dyn_res_c.reshape((6, x.shape[1]-1))
+            dyn_res_d1 = dyn_res_d1.reshape((6, xd.shape[1]-1))
+            dyn_res_d2 = dyn_res_d2.reshape((6, xd.shape[1]-1))
+            dyn_res_d3 = dyn_res_d3.reshape((6, xd.shape[1]-1))
+            meas_res = meas_res.reshape((3, xd.shape[1]-1))
+            dyn_res = np.vstack((dyn_res_d1, dyn_res_d2, dyn_res_d3))
             # print(meas_res.shape, dyn_res.shape)
             stacked_res = np.vstack((dyn_res, meas_res))
             # print(stacked_res.shape)
             return stacked_res.reshape(-1,1)
     
-        def residuals_sum(x,y,Q,R,dt):
-            res = residuals(x,y,Q,R,dt)
+        def residuals_sum(xc,xd,y,Q,R,dt):
+            res = residuals(xc,xd,y,Q,R,dt)
             return np.sum(res)
 
         #standard deviation of the GPS position measurement in meters
@@ -250,7 +251,7 @@ class BA(BatchLSQCore):
         velocity_std_dynamics = 8e-6 #*1e-3 #get to km/s
 
         #measurement noise matrix
-        R_measure = np.identity(9) * np.hstack([(((std_gps_measurement)**2)/3)*np.ones(3), ((std_velocity)**2)/3*np.ones(3), ((std_range)**2)/3*np.ones(3)])
+        R_measure = np.identity(3) * np.hstack([((std_range)**2)/3*np.ones(3)])
 
         #Process ovariance matrix for one satellite
         Q_proc = np.hstack((np.ones(3) * ((pose_std_dynamics)**2)/3, np.ones(3) * ((velocity_std_dynamics)**2)/3))
@@ -259,11 +260,12 @@ class BA(BatchLSQCore):
         
 
         #initial state
-        x0 = x0
+        x0d = x0d
+        xc=xc
 
         #initial measurement
         # y = measurement_function(x0)
 
-        super().__init__(x0, y, time_dynamics,
+        super().__init__(xc, x0d, y, time_dynamics,
                          measurement_function, residuals, Q_proc, R_measure,dt)
         # self, x0, y, dynamics, measure, Q, R
