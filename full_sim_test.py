@@ -226,13 +226,13 @@ class TestBASimConvergence(unittest.TestCase):
     def test_sim(self): 
 
         #import ground truths
-        x0_chief = np.loadtxt('data/Ground_Truth/groundtruth_data_chief.txt', delimiter='\t')
-        x0_deputy1 = np.loadtxt('data/Ground_Truth/groundtruth_data_dep1.txt', delimiter='\t')
-        x0_deputy2 = np.loadtxt('data/Ground_Truth/groundtruth_data_dep2.txt', delimiter='\t')
-        x0_deputy3 = np.loadtxt('data/Ground_Truth/groundtruth_data_dep3.txt', delimiter='\t')
+        x_chief = np.loadtxt('data/Ground_Truth/groundtruth_data_chief.txt', delimiter='\t')
+        x_deputy1 = np.loadtxt('data/Ground_Truth/groundtruth_data_dep1.txt', delimiter='\t')
+        x_deputy2 = np.loadtxt('data/Ground_Truth/groundtruth_data_dep2.txt', delimiter='\t')
+        x_deputy3 = np.loadtxt('data/Ground_Truth/groundtruth_data_dep3.txt', delimiter='\t')
         #concatenate ground truths
-        x0_gt = np.concatenate((x0_chief, x0_deputy1, x0_deputy2, x0_deputy3), axis=0)
-        dt=1
+        x0_gt = np.concatenate((x_chief, x_deputy1, x_deputy2, x_deputy3), axis=0)
+        dt=20
         idx = np.arange(0, dt*20, dt)
         x0_gt = x0_gt[:,idx]
         #generate measurements
@@ -242,21 +242,24 @@ class TestBASimConvergence(unittest.TestCase):
         y_ranging2 = np.linalg.norm(x0_gt[0:3] - x0_gt[12:15], axis = 0) + np.random.normal(0, 2, size = (x0_gt[0:3].shape[1]))
         y_ranging3 = np.linalg.norm(x0_gt[0:3] - x0_gt[18:21], axis = 0) + np.random.normal(0, 2, size = (x0_gt[0:3].shape[1]))
         #print("y_gps shape: ", y_gps.shape, "y_ranging1 shape: ", y_ranging1[None,:].shape)
-        y = np.concatenate((y_gps, y_ranging1[None,:], y_ranging2[None,:], y_ranging3[None,:]), axis = 0)
+        y = np.concatenate((y_ranging1[None,:], y_ranging2[None,:], y_ranging3[None,:]), axis = 0)
 
         #print("y shape: ", y.shape)
 
         #initial guess
-        x0c = np.concatenate((x0_gt[0:3,idx] + np.random.normal(0, 1, size=(x0_gt[0:3,idx].shape)),x0_gt[3:6] + np.random.normal(0,0.01, size = (x0_gt[3:6,idx].shape))))
-        x0d1 = np.concatenate((x0_gt[6:9,idx] + np.random.normal(0, 1, size=(x0_gt[6:9,idx].shape)),x0_gt[9:12] + np.random.normal(0,0.01, size = (x0_gt[9:12,idx].shape))))
-        x0d2 = np.concatenate((x0_gt[12:15,idx] + np.random.normal(0, 1, size=(x0_gt[12:15,idx].shape)),x0_gt[15:18] + np.random.normal(0,0.01, size = (x0_gt[15:18,idx].shape))))
-        x0d3 = np.concatenate((x0_gt[18:21,idx] + np.random.normal(0, 1, size=(x0_gt[18:21,idx].shape)),x0_gt[21:24] + np.random.normal(0,0.01, size = (x0_gt[21:24,idx].shape))))
-        x0 = np.concatenate((x0c, x0d1, x0d2, x0d3), axis=0)
+        x0c = x_chief[:,idx]#np.concatenate((x0_gt[0:3,idx] ,x0_gt[3:6,idx]))
+        # x0d1 = np.concatenate((x0_gt[6:9] + np.random.normal(0, 10, size=(x0_gt[6:9].shape)),x0_gt[9:12] + np.random.normal(0,0.01, size = (x0_gt[9:12].shape))))
+        # x0d2 = np.concatenate((x0_gt[12:15] + np.random.normal(0, 10, size=(x0_gt[12:15].shape)),x0_gt[15:18] + np.random.normal(0,0.01, size = (x0_gt[15:18].shape))))
+        # x0d3 = np.concatenate((x0_gt[18:21] + np.random.normal(0, 10, size=(x0_gt[18:21].shape)),x0_gt[21:24] + np.random.normal(0,0.01, size = (x0_gt[21:24].shape))))
+        x0d1 = x0_gt[6:12]
+        x0d2 = x0_gt[12:18]
+        x0d3 = x0_gt[18:24]
+        x0 = np.concatenate((x0d1, x0d2, x0d3), axis=0)
         # x0 = x0_gt
         # x0 = np.concatenate((x0_chief[:,idx],x0_chief[:,idx]+np.randn,x0_chief[:,idx],x0_chief[:,idx]), axis = 0)
 
         #Initialize the EKF class
-        BA_test = src.BA(x0,y,dt)
+        BA_test = src.BA(x0c, x0,y,dt)
 
         #iterate the BA
 
@@ -269,7 +272,7 @@ class TestBASimConvergence(unittest.TestCase):
         # dx = BA_test.solve()
 
         x_est = BA_test.iterate(max_iters)
-        error = x0_gt-x_est
+        error = x0_gt[6:24,:]-x_est
         breakpoint()
         #print("Batch LSQ Done")
 
