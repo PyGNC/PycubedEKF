@@ -161,13 +161,18 @@ class BA(BatchLSQCore):
                 x_cat[i*6:(i+1)*6] = xi_1
             return x_cat
         
-        def time_dynamics(x, dt):
+        def time_dynamics(x, dt,meas_gap):
             """"
             Batch dynamics function
             """
+            N = np.ceil(meas_gap/dt).astype(int)
+            dt_true = meas_gap/N
             x_dyn = np.zeros_like(x)
             for i in range(x.shape[1]):
-                x_dyn[:,i] = time_dynamics_single(x[:,i], dt)
+                x_new = x[:,i]
+                for j in range(N):
+                    x_new = time_dynamics_single(x_new, dt_true)
+                x_dyn[:,i] = x_new
             return x_dyn
         
         def measurement_function_single(xc,xd):

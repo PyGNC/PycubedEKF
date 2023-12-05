@@ -232,7 +232,7 @@ class TestBASimConvergence(unittest.TestCase):
         x_deputy3 = np.loadtxt('data/Ground_Truth/groundtruth_data_dep3.txt', delimiter='\t')
         #concatenate ground truths
         x0_gt = np.concatenate((x_chief, x_deputy1, x_deputy2, x_deputy3), axis=0)
-        dt=60
+        dt=60*10
         idx = np.arange(0, dt*20, dt)
         x0_gt = x0_gt[:,idx]
         #generate measurements
@@ -259,11 +259,11 @@ class TestBASimConvergence(unittest.TestCase):
         x0 = np.concatenate((x0c,x0c,x0c), axis=0)
 
         #Initialize the EKF class
-        BA_test = src.BA(x0c, x0,y,dt)
+        # BA_test = src.BA(x0c, x0,y,dt)
 
         #iterate the BA
 
-        max_iters = 10 #number of timesteps to run the Batch LSQ
+        # max_iters = 10 #number of timesteps to run the Batch LSQ
 
         #res_sum = BA_test.residuals_sum()
 
@@ -271,8 +271,8 @@ class TestBASimConvergence(unittest.TestCase):
 
         # dx = BA_test.solve()
 
-        x_est = BA_test.iterate(max_iters)
-        error = x0_gt[6:24,:]-x_est
+        # x_est = BA_test.iterate(max_iters)
+        # error = x0_gt[6:24,:]-x_est
         breakpoint()
         #print("Batch LSQ Done")
 
