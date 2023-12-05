@@ -198,8 +198,8 @@ class BA(BatchLSQCore):
             ############################################################
             xd = xd.reshape((18, -1))
             xc = xc.reshape((6, -1))
-            Q_sqrt_inv = Q#sqrtm(np.linalg.inv(Q))
-            R_sqrt_inv = R#sqrtm(np.linalg.inv(R))
+            Q_sqrt_inv = sqrtm(np.linalg.inv(Q))
+            R_sqrt_inv = sqrtm(np.linalg.inv(R))
             # dyn_res_c = np.array([])
             dyn_res_d1 = np.array([])
             dyn_res_d2 = np.array([])
