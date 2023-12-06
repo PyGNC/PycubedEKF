@@ -95,6 +95,24 @@ def rk4(x, h, f):
     k4 = f(x + h * k3)
     return x + h/6 * (k1 + 2*k2 + 2*k3 + k4)
 
+def rk4_multistep(x, h, f, N):
+    """
+    Runge-Kutta 4th order integrator for multiple timesteps between propagated points
+    """
+    x_new = x
+    for i in range(N):
+        x_new = rk4(x_new, h, f)
+    return x_new
+
+def calculate_dt(meas_gap, N,dt_goal):
+    """
+    Calculate the timestep for the batch least squares solver
+    """
+    N = np.ceil(meas_gap/dt_goal).astype(int)
+    dt = meas_gap/N
+    return dt
+    
+
 class EKF(EKFCore):
     """
     Defines the EKF for the orbit determination problem
@@ -148,7 +166,7 @@ class BA(BatchLSQCore):
     Defines the Batch Least-Squares solver for the orbit determination problem
     """
 
-    def __init__(self,xc, x0d,y,dt):
+    def __init__(self,xc, x0d,y,dt,N,meas_gap):
 
         def time_dynamics_single(x, dt):
             """
@@ -196,7 +214,7 @@ class BA(BatchLSQCore):
             #print(x_meas.shape)
             return x_meas
         
-        def residuals(xc, xd,y,Q,R,dt):
+        def residuals(xc, xd,y,Q,R,dt,meas_gap):
             ############################################################
             #generate residuals of dynamics and measurement            #
             #estimate of the orbit of multiple satellites              #
