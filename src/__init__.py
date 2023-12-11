@@ -104,13 +104,13 @@ def rk4_multistep(x, h, f, N):
         x_new = rk4(x_new, h, f)
     return x_new
 
-def calculate_dt(meas_gap, N,dt_goal):
+def calculate_dt(meas_gap,dt_goal):
     """
     Calculate the timestep for the batch least squares solver
     """
     N = np.ceil(meas_gap/dt_goal).astype(int)
     dt = meas_gap/N
-    return dt
+    return dt, N
     
 
 class EKF(EKFCore):
@@ -166,7 +166,7 @@ class BA(BatchLSQCore):
     Defines the Batch Least-Squares solver for the orbit determination problem
     """
 
-    def __init__(self,xc, x0d,y,dt,N,meas_gap):
+    def __init__(self,xc, x0d,y,dt,meas_gap,dt_goal):
 
         def time_dynamics_single(x, dt):
             """
@@ -198,7 +198,7 @@ class BA(BatchLSQCore):
             Measurement function for GPS measurements providing position and velocity, provides ranges between chief and deputy
             """
             # measurement_gps = xc
-            measurement_range = np.array([np.linalg.norm(xc[0:3] - xd[0:3]),np.linalg.norm(xc[0:3] - xd[6:9]),np.linalg.norm(xc[0:3] - xd[12:15])])
+            measurement_range = np.array([np.linalg.norm(xc[0:3] - xd[0:3])])#,np.linalg.norm(xc[0:3] - xd[6:9]),np.linalg.norm(xc[0:3] - xd[12:15])])
             # print(measurement_range.shape, measurement_gps.shape)
             # measurement = np.concatenate((measurement_gps, measurement_range))
             return measurement_range
@@ -214,37 +214,42 @@ class BA(BatchLSQCore):
             #print(x_meas.shape)
             return x_meas
         
-        def residuals(xc, xd,y,Q,R,dt,meas_gap):
+        def residuals(xc, xd,y,Q,R,dt,meas_gap, dt_goal):
             ############################################################
             #generate residuals of dynamics and measurement            #
             #estimate of the orbit of multiple satellites              #
             ############################################################
-            xd = xd.reshape((18, -1))
+            # xd = xd.reshape((18, -1))
+            xd  = xd.reshape((6, -1))
             xc = xc.reshape((6, -1))
-            Q_sqrt_inv = sqrtm(np.linalg.inv(Q))
-            R_sqrt_inv = sqrtm(np.linalg.inv(R))
+            Q = sqrtm(np.linalg.inv(Q))
+            # R_sqrt_inv = sqrtm(np.linalg.inv(R))
+            R = np.sqrt(R)
             # dyn_res_c = np.array([])
             dyn_res_d1 = np.array([])
-            dyn_res_d2 = np.array([])
-            dyn_res_d3 = np.array([])
+            # dyn_res_d2 = np.array([])
+            # dyn_res_d3 = np.array([])
             meas_res = np.array([])
+            dt_real, N = calculate_dt(meas_gap,dt_goal)
             for i in range(xd.shape[1]-1):
                 # dyn_res_ci = Q_sqrt_inv@(x[0:6,i+1] - rk4(x[0:6,i],dt,process_dynamics))
                 # dyn_res_c = np.concatenate((dyn_res_c, dyn_res_ci))
-                dyn_res_d1i = Q_sqrt_inv@(xd[0:6,i+1] - rk4(xd[0:6,i],dt,process_dynamics))
+                dyn_res_d1i = Q@(xd[0:6,i+1] - rk4_multistep(xd[0:6,i],dt_goal,process_dynamics,N))
                 dyn_res_d1 = np.hstack((dyn_res_d1, dyn_res_d1i))
-                dyn_res_d2i = Q_sqrt_inv@(xd[6:12,i+1] - rk4(xd[6:12,i],dt,process_dynamics))
-                dyn_res_d2 = np.hstack((dyn_res_d2, dyn_res_d2i))
-                dyn_res_d3i = Q_sqrt_inv@(xd[12:18,i+1] - rk4(xd[12:18,i],dt,process_dynamics))
-                dyn_res_d3 = np.hstack((dyn_res_d3, dyn_res_d3i))
-                meas_resi = R_sqrt_inv@(measurement_function_single(xc[:,i],xd[:,i]) - y[:,i])
+                # dyn_res_d2i = Q_sqrt_inv@(xd[6:12,i+1] - rk4(xd[6:12,i],dt,process_dynamics))
+                # dyn_res_d2 = np.hstack((dyn_res_d2, dyn_res_d2i))
+                # dyn_res_d3i = Q_sqrt_inv@(xd[12:18,i+1] - rk4(xd[12:18,i],dt,process_dynamics))
+                # dyn_res_d3 = np.hstack((dyn_res_d3, dyn_res_d3i))
+                meas_resi = R*(measurement_function_single(xc[:,i],xd[:,i]) - y[:,i])
                 meas_res = np.hstack((meas_res, meas_resi))
             # dyn_res_c = dyn_res_c.reshape((6, x.shape[1]-1))
             dyn_res_d1 = dyn_res_d1.reshape((6, xd.shape[1]-1))
-            dyn_res_d2 = dyn_res_d2.reshape((6, xd.shape[1]-1))
-            dyn_res_d3 = dyn_res_d3.reshape((6, xd.shape[1]-1))
-            meas_res = meas_res.reshape((3, xd.shape[1]-1))
-            dyn_res = np.vstack((dyn_res_d1, dyn_res_d2, dyn_res_d3))
+            # dyn_res_d2 = dyn_res_d2.reshape((6, xd.shape[1]-1))
+            # dyn_res_d3 = dyn_res_d3.reshape((6, xd.shape[1]-1))
+            # meas_res = meas_res.reshape((3, xd.shape[1]-1))
+            meas_res = meas_res.reshape((1, xd.shape[1]-1))
+            # dyn_res = np.vstack((dyn_res_d1, dyn_res_d2, dyn_res_d3))
+            dyn_res = dyn_res_d1
             # print(meas_res.shape, dyn_res.shape)
             stacked_res = np.vstack((dyn_res, meas_res))
             # print(stacked_res.shape)
@@ -263,21 +268,22 @@ class BA(BatchLSQCore):
         #std_velocity = 0.01
 
         # standard deviation of the range measurement in meters
-        std_range = 1
+        std_range = 10
 
         #tuning parameters for the first order gauss markov model
         # q_betas = 2e-9 * np.ones(3)
         # q_eps = 5.5e-11 * np.ones(3)
 
         # Process noise covariances
-        pose_std_dynamics = 4e-6#*1e-3 #get to km
-        velocity_std_dynamics = 8e-6 #*1e-3 #get to km/s
+        pose_std_dynamics = 5#4e-6#*1e-3 #get to km
+        velocity_std_dynamics = 0.04#8e-6 #*1e-3 #get to km/s
 
         #measurement noise matrix
-        R_measure = np.identity(3) * np.hstack([((std_range)**2)/3*np.ones(3)])
+        # R_measure = np.identity(3) * np.hstack([((std_range)**2)/3*np.ones(3)])
+        R_measure = std_range**2
 
         #Process ovariance matrix for one satellite
-        Q_proc = np.hstack((np.ones(3) * ((pose_std_dynamics)**2)/3, np.ones(3) * ((velocity_std_dynamics)**2)/3))
+        Q_proc = np.hstack((np.ones(3) * ((pose_std_dynamics)**2), np.ones(3) * ((velocity_std_dynamics)**2)))
         #Repeat Q_ind for all satellites
         Q_proc = np.diag(Q_proc)
         
@@ -285,10 +291,12 @@ class BA(BatchLSQCore):
         #initial state
         x0d = x0d
         xc=xc
+        dt_goal = dt_goal
+        meas_gap = meas_gap
 
         #initial measurement
         # y = measurement_function(x0)
 
         super().__init__(xc, x0d, y, time_dynamics,
-                         measurement_function, residuals, Q_proc, R_measure,dt)
+                         measurement_function, residuals, Q_proc, R_measure,dt,meas_gap,dt_goal)
         # self, x0, y, dynamics, measure, Q, R

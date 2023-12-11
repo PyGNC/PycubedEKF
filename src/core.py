@@ -11,7 +11,7 @@ import brahe
 # x[6], x[7], x[8] -> x,y,z unmodeled accelerations (epsilons)
 # x[9], x[10], x[11] -> time correlation coefficients (betas)
 class BatchLSQCore:
-    def __init__(self, xc,x0d, y, dynamics, measure, residuals, Q, R,dt) -> None:
+    def __init__(self, xc,x0d, y, dynamics, measure, residuals, Q, R,dt, meas_gap, dt_goal) -> None:
         self.xc = xc # chief state
         self.x = x0d # deputy state
         self.y = y # measurements
@@ -21,6 +21,8 @@ class BatchLSQCore:
         self.R = R # measurement noise
         self.Q = Q # process noise
         self.dt = dt
+        self.meas_gap = meas_gap
+        self.dt_goal = dt_goal
     
     # def residuals(self,x,y):
     #     ############################################################
@@ -42,15 +44,15 @@ class BatchLSQCore:
     
     def jac(self):
         # print("calculating jacobian")
-        J = jacobian(lambda x: self.r(self.xc,x, self.y, self.Q, self.R, self.dt))(self.x.reshape(-1,1))
+        J = jacobian(lambda x: self.r(self.xc,x, self.y, self.Q, self.R, self.dt, self.meas_gap, self.dt_goal))(self.x.reshape(-1,1))
         return J
     
     def linesearch(self, dx, max_iter):
         alpha = 1
         for i in range(max_iter):
-            dx = dx.reshape((18, -1))
+            dx = dx.reshape((6, -1))
             x_new = self.x + alpha*dx
-            if np.linalg.norm(self.r(self.xc,x_new, self.y, self.Q, self.R, self.dt)) < np.linalg.norm(self.r(self.xc,self.x, self.y, self.Q, self.R, self.dt)):
+            if np.linalg.norm(self.r(self.xc,x_new, self.y, self.Q, self.R, self.dt,self.meas_gap, self.dt_goal)) < np.linalg.norm(self.r(self.xc,self.x, self.y, self.Q, self.R, self.dt,self.meas_gap, self.dt_goal)):
                 return alpha*dx
             else:
                 alpha = alpha/2
@@ -63,17 +65,18 @@ class BatchLSQCore:
         J = self.jac()
         J = J.reshape((J.shape[0], -1))
         Jt = J.T
-        b = self.r(self.xc, self.x, self.y, self.Q, self.R, self.dt)
+        b = self.r(self.xc, self.x, self.y, self.Q, self.R, self.dt, self.meas_gap, self.dt_goal)
         H = Jt@J
         g = Jt@b
-        dx = solve(H, g)
-        dx = self.linesearch(dx,35)
         # breakpoint()
+        dx = solve(H, g)
+        dx = self.linesearch(dx,10)
+        breakpoint()
         return dx
 
     def update(self):
         dx = self.solver()
-        dx = dx.reshape((18, -1))
+        dx = dx.reshape((6, -1))
         return self.x + dx
     
     def iterate(self, max_iter):
