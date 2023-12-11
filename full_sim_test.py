@@ -252,7 +252,7 @@ class TestBASimConvergence(unittest.TestCase):
 
         #initial guess
         x0c = x_chief[:,idx]#np.concatenate((x0_gt[0:3,idx] ,x0_gt[3:6,idx]))
-        x0d1 = np.concatenate((x0_gt[6:9] + np.random.normal(0, 2, size=(x0_gt[6:9].shape)),x0_gt[9:12] + np.random.normal(0,2, size = (x0_gt[9:12].shape))))
+        x0d1 = np.concatenate((x0_gt[6:9] + np.random.normal(0, 20000, size=(x0_gt[6:9].shape)),x0_gt[9:12] + np.random.normal(0,0.1, size = (x0_gt[9:12].shape))))
         x0d2 = np.concatenate((x0_gt[12:15] + np.random.normal(0, 10, size=(x0_gt[12:15].shape)),x0_gt[15:18] + np.random.normal(0,0.01, size = (x0_gt[15:18].shape))))
         x0d3 = np.concatenate((x0_gt[18:21] + np.random.normal(0, 10, size=(x0_gt[18:21].shape)),x0_gt[21:24] + np.random.normal(0,0.01, size = (x0_gt[21:24].shape))))
         # x0d1 = x0_gt[6:12]
